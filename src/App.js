@@ -1,69 +1,92 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import StarRating from './StarRating';
 
-const tempMovieData = [
-  {
-    imdbID: 'tt1375666',
-    Title: 'Inception',
-    Year: '2010',
-    Poster:
-      'https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg',
-  },
-  {
-    imdbID: 'tt0133093',
-    Title: 'The Matrix',
-    Year: '1999',
-    Poster:
-      'https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg',
-  },
-  {
-    imdbID: 'tt6751668',
-    Title: 'Parasite',
-    Year: '2019',
-    Poster:
-      'https://m.media-amazon.com/images/M/MV5BYWZjMjk3ZTItODQ2ZC00NTY5LWE0ZDYtZTI3MjcwN2Q5NTVkXkEyXkFqcGdeQXVyODk4OTc3MTY@._V1_SX300.jpg',
-  },
-];
-
-const tempWatchedData = [
-  {
-    imdbID: 'tt1375666',
-    Title: 'Inception',
-    Year: '2010',
-    Poster:
-      'https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg',
-    runtime: 148,
-    imdbRating: 8.8,
-    userRating: 10,
-  },
-  {
-    imdbID: 'tt0088763',
-    Title: 'Back to the Future',
-    Year: '1985',
-    Poster:
-      'https://m.media-amazon.com/images/M/MV5BZmU0M2Y1OGUtZjIxNi00ZjBkLTg1MjgtOWIyNThiZWIwYjRiXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg',
-    runtime: 116,
-    imdbRating: 8.5,
-    userRating: 9,
-  },
-];
-
-const average = (arr) =>
-  arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
+// API base URL
+const API_URL = 'https://imdb.iamidiotareyoutoo.com/search';
 
 export default function App() {
-  const [movies, setMovies] = useState(tempMovieData);
-  const [watched, setWatched] = useState(tempWatchedData);
+  const [movies, setMovies] = useState([]);
+  const [watched, setWatched] = useState([]);
+  const [query, setQuery] = useState('');
+  const [totalResults, setTotalResults] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [triggerFetch, setTriggerFetch] = useState(false);
+
+  const handleAddWatched = (movie) => {
+    setWatched((watched) => {
+      const existingMovie = watched.find(
+        (m) => m['#IMDB_ID'] === movie['#IMDB_ID']
+      );
+      if (existingMovie) {
+        return watched.map((m) =>
+          m['#IMDB_ID'] === movie['#IMDB_ID']
+            ? { ...m, userRating: movie.userRating }
+            : m
+        );
+      } else {
+        return [...watched, movie];
+      }
+    });
+  };
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      if (query.length < 1) {
+        setMovies([]);
+        setTotalResults(0);
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const res = await fetch(
+          `${API_URL}?q=${encodeURIComponent(query.trim())}`
+        );
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.description)) {
+          setMovies(data.description);
+          setTotalResults(data.description.length);
+        } else {
+          throw new Error('Invalid data format received from API');
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (triggerFetch) {
+      fetchMovies();
+      setTriggerFetch(true);
+    }
+  }, [query, triggerFetch]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setTriggerFetch(true);
+    }
+  };
+
   return (
     <>
       <NavBar>
-        <Search />
-        <NumResults movies={movies} />
+        <Search
+          query={query}
+          setQuery={setQuery}
+          handleKeyDown={handleKeyDown}
+        />
+        <NumResults totalResults={totalResults} />
       </NavBar>
 
       <Main>
         {/* 法1 */}
+
         <Box>
-          <MovieList movies={movies} />
+          <MovieList
+            movies={movies}
+            onAddWatched={handleAddWatched}
+            loading={isLoading}
+          />
         </Box>
         <Box>
           <WatchedSummary watched={watched} />
@@ -97,20 +120,19 @@ function Logo() {
   return (
     <div className='logo'>
       <span role='img'>🍿</span>
-      <h1>usePopcorn</h1>
+      <h1>USE POPCORN</h1>
     </div>
   );
 }
 
-function NumResults({ movies }) {
+function NumResults({ totalResults }) {
   return (
     <p className='num-results'>
-      Found <strong>{movies.length}</strong> results
+      Found <strong>{totalResults}</strong> results
     </p>
   );
 }
-function Search() {
-  const [query, setQuery] = useState('');
+function Search({ query, setQuery, handleKeyDown }) {
   return (
     <input
       className='search'
@@ -118,6 +140,7 @@ function Search() {
       placeholder='Search movies...'
       value={query}
       onChange={(e) => setQuery(e.target.value)}
+      onKeyDown={handleKeyDown}
     />
   );
 }
@@ -159,26 +182,101 @@ function Box({ children }) {
 //     </div>
 //   );
 // }
-function MovieList({ movies }) {
+function MovieList({ movies, onAddWatched, loading }) {
   return (
     <ul className='list'>
-      {movies?.map((movie) => (
-        <Movie movie={movie} key={movie.imdbID} />
-      ))}
+      {loading ? (
+        <div className='loader'>
+          <div className='circle'>
+            <div className='dot'></div>
+            <div className='outline'></div>
+          </div>
+          <div className='circle'>
+            <div className='dot'></div>
+            <div className='outline'></div>
+          </div>
+          <div className='circle'>
+            <div className='dot'></div>
+            <div className='outline'></div>
+          </div>
+          <div className='circle'>
+            <div className='dot'></div>
+            <div className='outline'></div>
+          </div>
+        </div>
+      ) : (
+        movies?.map((movie) => (
+          <Movie
+            movie={movie}
+            key={movie['#IMDB_ID']}
+            onAddWatched={onAddWatched}
+          />
+        ))
+      )}
     </ul>
   );
 }
 
-function Movie({ movie }) {
+function Movie({ movie, onAddWatched }) {
+  const [userRating, setUserRating] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const handleRating = (rating) => {
+    setUserRating(rating);
+    onAddWatched({ ...movie, userRating: rating });
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
   return (
     <li>
-      <img src={movie.Poster} alt={`${movie.Title} poster`} />
-      <h3>{movie.Title}</h3>
+      <div
+        style={{ position: 'relative', width: '100%', paddingBottom: '150%' }}
+      >
+        {!imageLoaded && (
+          <div
+            className='loader'
+            style={{
+              position: 'absolute',
+              top: '-30px',
+              left: '-55px',
+              zIndex: 1,
+            }}
+          >
+            <div className='circle'>
+              <div className='dot'></div>
+              <div className='outline'></div>
+            </div>
+          </div>
+        )}
+        <img
+          src={movie['#IMG_POSTER']}
+          alt={`${movie['#TITLE']} poster`}
+          onLoad={handleImageLoad}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: imageLoaded ? 'block' : 'none',
+          }}
+        />
+      </div>
+      <h3>{movie['#TITLE']}</h3>
       <div>
-        <p>
-          <span>🗓</span>
-          <span>{movie.Year}</span>
+        <p style={{ marginTop: '10px' }}>
+          <span>📅</span>
+          <span>{movie['#YEAR']}</span>
         </p>
+        <StarRating
+          maxRating={5}
+          messages={['超級難看', '不好看', '還行', '很好看', '超級好看']}
+          defaultRating={userRating}
+          onRate={handleRating}
+        />
       </div>
     </li>
   );
@@ -186,40 +284,54 @@ function Movie({ movie }) {
 
 function WatchedMoviesList({ watched }) {
   return (
-    <ul className='list'>
-      {watched.map((movie) => (
-        <WatchedMovie movie={movie} key={movie.imdbID} />
-      ))}
-    </ul>
+    <div>
+      {watched.length === 0 ? (
+        <p style={{ textAlign: 'center', fontSize: '14px', marginTop: '10%' }}>
+          You haven't rated yet.
+        </p>
+      ) : (
+        <ul className='list'>
+          {watched.map((movie) => (
+            <WatchedMovie movie={movie} key={movie['#IMDB_ID']} />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
 function WatchedMovie({ movie }) {
   return (
     <li>
-      <img src={movie.Poster} alt={`${movie.Title} poster`} />
-      <h3>{movie.Title}</h3>
+      <img src={movie['#IMG_POSTER']} alt={`${movie['#TITLE']} poster`} />
+      <h3>{movie['#TITLE']}</h3>
       <div>
         <p>
-          <span>⭐️</span>
-          <span>{movie.imdbRating}</span>
+          <span>🏆</span>
+          <span>{movie['#RANK']}</span>
         </p>
         <p>
           <span>🌟</span>
           <span>{movie.userRating}</span>
         </p>
+
         <p>
-          <span>⏳</span>
-          <span>{movie.runtime} min</span>
+          <span>🔗</span>
+          <a
+            href={`https://www.imdb.com/title/${movie['#IMDB_ID']}`}
+            target='_blank'
+            rel='noopener noreferrer'
+            style={{ color: 'inherit' }}
+          >
+            IMDb
+          </a>
         </p>
       </div>
     </li>
   );
 }
+
 function WatchedSummary({ watched }) {
-  const avgImdbRating = average(watched.map((movie) => movie.imdbRating));
-  const avgUserRating = average(watched.map((movie) => movie.userRating));
-  const avgRuntime = average(watched.map((movie) => movie.runtime));
   return (
     <div className='summary'>
       <h2>Movies you watched</h2>
@@ -229,16 +341,12 @@ function WatchedSummary({ watched }) {
           <span>{watched.length} movies</span>
         </p>
         <p>
-          <span>⭐️</span>
-          <span>{avgImdbRating}</span>
+          <span>🏆</span>
+          <span>RANK</span>
         </p>
         <p>
           <span>🌟</span>
-          <span>{avgUserRating}</span>
-        </p>
-        <p>
-          <span>⏳</span>
-          <span>{avgRuntime} min</span>
+          <span>Your Rating</span>
         </p>
       </div>
     </div>

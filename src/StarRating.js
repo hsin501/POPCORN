@@ -10,6 +10,8 @@ const containerStyle = {
 
 const starContainerStyle = {
   display: 'flex',
+  gap: '5px',
+  alignItems: 'center',
 };
 
 // 避免輸入的是不符合的類型
@@ -25,16 +27,18 @@ StarRating.propTypes = {
 export default function StarRating({
   maxRating = 5,
   color = '#fcc419',
-  size = 48,
+  size = 24,
   className = '',
   messages = [],
   defaultRating = 0,
+  onRate,
 }) {
   const [rating, setRating] = useState(defaultRating);
   const [tempRating, setTemprating] = useState(0);
 
-  function handleRating(rating) {
-    setRating(rating);
+  function handleRating(newRating) {
+    setRating(newRating);
+    onRate(newRating);
   }
 
   const textStyle = {
@@ -42,6 +46,8 @@ export default function StarRating({
     margin: '0',
     color,
     fontSize: `${size / 1.5}px`,
+    minWidth: `100px`,
+    whiteSpace: 'nowrap',
   };
 
   return (
