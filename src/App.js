@@ -10,7 +10,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [totalResults, setTotalResults] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [triggerFetch, setTriggerFetch] = useState(false);
+  const [debounceQuery, setDebounceQuery] = useState('');
 
   const handleAddWatched = (movie) => {
     setWatched((watched) => {
@@ -30,8 +30,15 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleDebounce = setTimeout(() => {
+      setDebounceQuery(query);
+    }, 1000);
+    return () => clearTimeout(handleDebounce);
+  }, [query]);
+
+  useEffect(() => {
     const fetchMovies = async () => {
-      if (query.length < 1) {
+      if (debounceQuery.length < 1) {
         setMovies([]);
         setTotalResults(0);
         setIsLoading(false);
@@ -40,7 +47,7 @@ export default function App() {
       try {
         setIsLoading(true);
         const res = await fetch(
-          `${API_URL}?q=${encodeURIComponent(query.trim())}`
+          `${API_URL}?q=${encodeURIComponent(debounceQuery.trim())}`
         );
         const data = await res.json();
         if (data.ok && Array.isArray(data.description)) {
@@ -55,26 +62,13 @@ export default function App() {
         setIsLoading(false);
       }
     };
-    if (triggerFetch) {
-      fetchMovies();
-      setTriggerFetch(true);
-    }
-  }, [query, triggerFetch]);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      setTriggerFetch(true);
-    }
-  };
+    fetchMovies();
+  }, [debounceQuery]);
 
   return (
     <>
       <NavBar>
-        <Search
-          query={query}
-          setQuery={setQuery}
-          handleKeyDown={handleKeyDown}
-        />
+        <Search query={query} setQuery={setQuery} />
         <NumResults totalResults={totalResults} />
       </NavBar>
 
